@@ -58,6 +58,7 @@ pub struct X11Surface {
     xwm: Option<XwmId>,
     client_scale: Option<Arc<AtomicF64>>,
     window: X11Window,
+    wm_window: Option<X11Window>,
     pub(super) conn: Weak<RustConnection>,
     pub(super) atoms: super::Atoms,
     pub(crate) state: Arc<Mutex<SharedSurfaceState>>,
@@ -207,6 +208,7 @@ impl X11Surface {
             xwm: xwm.map(|wm| wm.id),
             client_scale: xwm.map(|wm| wm.client_scale.clone()),
             window,
+            wm_window: xwm.map(|wm| *wm.wm_window),
             conn,
             atoms,
             state: Arc::new(Mutex::new(SharedSurfaceState {
@@ -1218,7 +1220,12 @@ impl<D: SeatHandler + 'static> KeyboardTarget<D> for X11Surface {
         if self.input_model() == WmInputModel::None {
             return;
         } else if let Some(conn) = self.conn.upgrade() {
-            if let Err(err) = conn.set_input_focus(InputFocus::NONE, x11rb::NONE, x11rb::CURRENT_TIME) {
+            // Set focus to the Xwm's internal window instead of NONE.
+            // Setting focus to NONE disables XWayland's keyboard event
+            // dispatch entirely, which breaks XTest synthetic events
+            // and XRecord capture (used by overlay apps, push-to-talk).
+            let focus_target = self.wm_window.unwrap_or(x11rb::NONE);
+            if let Err(err) = conn.set_input_focus(InputFocus::NONE, focus_target, x11rb::CURRENT_TIME) {
                 warn!("Unable to unfocus X11Surface ({:?}): {}", self.window, err);
             }
             let _ = conn.flush();
