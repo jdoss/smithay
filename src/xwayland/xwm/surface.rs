@@ -1214,21 +1214,9 @@ impl<D: SeatHandler + 'static> KeyboardTarget<D> for X11Surface {
         }
     }
 
-    fn leave(&self, seat: &Seat<D>, data: &mut D, serial: Serial) {
-        if self.input_model() == WmInputModel::None {
-            return;
-        } else if let Some(conn) = self.conn.upgrade() {
-            if let Err(err) = conn.set_input_focus(InputFocus::NONE, x11rb::NONE, x11rb::CURRENT_TIME) {
-                warn!("Unable to unfocus X11Surface ({:?}): {}", self.window, err);
-            }
-            let _ = conn.flush();
-        }
-
+    fn leave(&self, _seat: &Seat<D>, _data: &mut D, _serial: Serial) {
         let mut state = self.state.lock().unwrap();
         let _ = state.pending_enter.take();
-        if let Some(surface) = state.wl_surface.as_ref() {
-            KeyboardTarget::leave(surface, seat, data, serial);
-        }
     }
 
     fn key(

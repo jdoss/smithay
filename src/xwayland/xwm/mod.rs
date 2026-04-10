@@ -2099,7 +2099,7 @@ where
             }
         }
         Event::FocusIn(n) => {
-            if xwm.windows.iter().any(|x| x.window_id() == n.event) {
+            if let Some(surface) = xwm.windows.iter().find(|x| x.window_id() == n.event).cloned() {
                 conn.change_property32(
                     PropMode::REPLACE,
                     xwm.screen.root,
@@ -2107,19 +2107,11 @@ where
                     AtomEnum::WINDOW,
                     &[n.event],
                 )?;
+                drop(_guard);
+                state.active_window_request(xwm_id, surface, 0, None);
             }
         }
-        Event::FocusOut(n) => {
-            if xwm.windows.iter().any(|x| x.window_id() == n.event) {
-                conn.change_property32(
-                    PropMode::REPLACE,
-                    xwm.screen.root,
-                    xwm.atoms._NET_ACTIVE_WINDOW,
-                    AtomEnum::WINDOW,
-                    &[x11rb::NONE],
-                )?;
-            }
-        }
+        Event::FocusOut(_) => {}
         Event::ClientMessage(msg) => {
             if let Some(reply) = conn.get_atom_name(msg.type_)?.reply_unchecked()? {
                 trace!(
